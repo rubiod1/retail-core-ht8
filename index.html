@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Retail-Core · Hoja de trabajo 8 · Del delta al estado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,800&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F3EEE3; --card:#FBF8F1; --soft:#EBE4D3;
+  --ink:#1C1B19; --muted:#6B665B; --line:#D3CAB5;
+  --accent:#C2411F; --accent2:#1F5C4D; --ochre:#A8741A;
+  --code:#1C1B19;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:4.5rem}
+body{
+  background-color:var(--paper);
+  background-image:radial-gradient(rgba(28,27,25,.075) 1px, transparent 1px);
+  background-size:22px 22px;
+  color:var(--ink);font-family:'Source Sans 3',system-ui,sans-serif;line-height:1.62;font-size:1.02rem
+}
+#bg{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+
+/* ---------- barra superior ---------- */
+.top{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.65rem 5vw;background:rgba(243,238,227,.9);backdrop-filter:blur(6px);border-bottom:1px solid var(--ink)}
+.top .brand{font-family:'JetBrains Mono',monospace;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.top .brand b{color:var(--accent);font-weight:500}
+.top nav{display:flex;gap:.2rem;flex-wrap:wrap;justify-content:flex-end}
+.top nav a{font-family:'JetBrains Mono',monospace;font-size:.74rem;color:var(--muted);text-decoration:none;padding:.28rem .6rem;border-radius:2px;border:1px solid transparent}
+.top nav a:hover{color:var(--ink);border-color:var(--ink)}
+.top nav a.on{color:var(--paper);background:var(--ink)}
+.bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:11;transition:width .2s}
+
+/* ---------- secciones ---------- */
+main{position:relative;z-index:1;padding-top:3.2rem}
+section.s{position:relative;min-height:100vh;padding:10vh 8vw 10vh calc(8vw + 36px);display:flex;flex-direction:column;justify-content:center;border-bottom:1px solid var(--line);opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s ease}
+section.s.in{opacity:1;transform:none}
+section.s.hero{min-height:92vh}
+/* margen tipo log: línea vertical + etiqueta de offset */
+section.s::before{content:"";position:absolute;left:4.2vw;top:0;bottom:0;width:1px;background:var(--line)}
+section.s::after{content:"OFFSET " attr(data-offset);position:absolute;left:calc(4.2vw + 10px);top:10vh;writing-mode:vertical-rl;font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.22em;color:var(--muted)}
+
+.kicker{font-family:'JetBrains Mono',monospace;font-size:.76rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:.9rem;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
+.sec{display:inline-block;font-family:'Fraunces',serif;font-weight:700;color:var(--paper);background:var(--accent);padding:.02rem .55rem;border-radius:2px;font-size:.95rem;letter-spacing:0}
+.owner{font-family:'JetBrains Mono',monospace;font-size:.68rem;letter-spacing:.06em;color:var(--ink);border:1px solid var(--ink);border-radius:2px;padding:.1rem .55rem;text-transform:none}
+
+h1,h2,h3{font-family:'Fraunces',serif}
+h1{font-weight:800;line-height:1.02;font-size:clamp(2.5rem,6.4vw,4.9rem);margin-bottom:1.1rem;letter-spacing:-.02em}
+h2{font-weight:700;line-height:1.1;font-size:clamp(1.65rem,3.4vw,2.55rem);margin-bottom:1.4rem;letter-spacing:-.01em}
+h3{font-weight:700;font-size:1.1rem;color:var(--ink);margin-bottom:.4rem}
+.strike{color:var(--muted);text-decoration:line-through;text-decoration-thickness:3px;text-decoration-color:var(--accent)}
+.acc{color:var(--accent);box-shadow:inset 0 -.18em 0 rgba(194,65,31,.18)}
+p,li{font-size:1.02rem}
+.muted{color:var(--muted)}
+
+/* ---------- componentes ---------- */
+.grid{display:grid;gap:1.1rem;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:4px;padding:1.2rem 1.3rem;box-shadow:3px 3px 0 var(--line)}
+.card.accent{border-left:4px solid var(--accent2)}
+.card.warn{border-left:4px solid var(--accent)}
+.callout{border-left:4px solid var(--accent);background:var(--soft);padding:1rem 1.2rem;border-radius:0 4px 4px 0;margin-top:1.2rem}
+.callout.g{border-left-color:var(--accent2)}
+.callout h3{margin-bottom:.3rem}
+code{font-family:'JetBrains Mono',monospace;font-size:.88em;background:var(--soft);padding:.05rem .35rem;border-radius:2px}
+pre{font-family:'JetBrains Mono',monospace;background:var(--code);color:#EDE6D6;border-radius:4px;padding:1rem 1.2rem;font-size:.82rem;line-height:1.6;overflow:auto;max-height:75vh}
+pre code{background:none;padding:0;font-size:inherit}
+.k{color:#E7B76A} .s2{color:#A9CBA0} .cm{color:#8f897b}
+.tag{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:.7rem;padding:.12rem .55rem;border-radius:2px;border:1px solid var(--ink);color:var(--ink);margin:0 .4rem .4rem 0;letter-spacing:.03em}
+.tag.amber{border-color:var(--ochre);color:var(--ochre)}
+.tag.red{border-color:var(--accent);color:var(--accent)}
+.tag.green{border-color:var(--accent2);color:var(--accent2)}
+ul.clean{list-style:none}
+ul.clean li{padding-left:1.4rem;position:relative;margin-bottom:.55rem}
+ul.clean li:before{content:"";position:absolute;left:0;top:.62em;width:.5rem;height:.5rem;background:var(--accent)}
+a{color:var(--accent2)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.94rem;background:var(--card)}
+th,td{text-align:left;padding:.65rem .75rem;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:'JetBrains Mono',monospace;font-weight:500;color:var(--muted);font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;border-bottom:2px solid var(--ink)}
+
+figure{margin:1.2rem 0}
+figure svg{width:100%;height:auto;background:var(--card);border:1px solid var(--line);border-radius:4px;box-shadow:3px 3px 0 var(--line)}
+figcaption{font-size:.92rem;color:var(--muted);margin-top:.7rem}
+figcaption b{color:var(--accent);font-family:'JetBrains Mono',monospace;font-weight:500}
+.flow text{font-family:'JetBrains Mono',monospace;fill:var(--ink);font-size:13px}
+.flow .sub{fill:var(--muted);font-size:11px}
+.flow .hd{font-family:'Fraunces',serif;font-weight:700;font-size:16px}
+.flow .hd.bad{fill:var(--accent)} .flow .hd.good{fill:var(--accent2)}
+.flow .small-bad{fill:var(--accent);font-size:12px}
+.flow .bx{fill:var(--card);stroke:var(--ink);stroke-width:1.5}
+.flow .bx.bad{stroke:var(--accent);stroke-width:2.2}
+.flow .bx.good{stroke:var(--accent2);stroke-width:2.2}
+.flow .bx.reg{stroke:var(--ochre);stroke-width:2.2}
+.flow .ln{stroke:#A39A85;stroke-width:2.5;fill:none}
+.flow .ln.bad{stroke:var(--accent);stroke-dasharray:7 5;stroke-width:2}
+.flow .ln.reg{stroke:var(--ochre);stroke-dasharray:6 5;stroke-width:2}
+.flow .sep{stroke:var(--line);stroke-dasharray:4 6}
+.flow .m-a{fill:var(--accent)} .flow .m-i{fill:var(--ink)} .flow .m-g{fill:var(--accent2)} .flow .m-o{fill:var(--ochre)}
+
+.row{display:flex;gap:.6rem;flex-wrap:wrap;margin:.6rem 0 1rem;align-items:center}
+.btn{background:transparent;color:var(--ink);border:1px solid var(--ink);padding:.48rem 1rem;border-radius:2px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:.8rem;transition:.15s;text-decoration:none;display:inline-block}
+.btn:hover{background:var(--soft)}
+.btn.on{background:var(--ink);color:var(--paper)}
+.btn.amberon.on{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+.btn:disabled{opacity:.35;cursor:default}
+.btn:disabled:hover{background:transparent}
+.view{display:none}.view.on{display:block}
+
+.index a{display:flex;gap:1rem;align-items:baseline;padding:.85rem 0;border-bottom:1px solid var(--line);color:var(--ink);text-decoration:none}
+.index a:hover h3{color:var(--accent)}
+.index .n{font-family:'Fraunces',serif;font-weight:800;color:var(--accent);width:3.4rem;font-size:1.4rem;flex:none}
+.result{margin-top:1rem;padding:1.1rem 1.3rem;border-radius:4px;border:1px solid var(--ink);background:var(--card);min-height:120px;box-shadow:3px 3px 0 var(--line)}
+.walk{border:1.5px solid var(--ink);border-radius:4px;background:var(--card);padding:1.2rem 1.4rem;min-height:165px;box-shadow:3px 3px 0 var(--line)}
+.walk .lbl{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--muted);letter-spacing:.14em;text-transform:uppercase}
+.walk h3{margin-top:.4rem}
+.dotsteps{display:flex;gap:.4rem;margin-top:.9rem;flex-wrap:wrap}
+.dotsteps span{width:28px;height:6px;border-radius:1px;background:var(--line);cursor:pointer}
+.dotsteps span.on{background:var(--accent)}
+.count{font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--muted);white-space:nowrap}
+.foot{font-family:'JetBrains Mono',monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.8rem 1.4rem;margin-top:2.2rem;max-width:920px}
+.meta div{border-top:1px solid var(--ink);padding-top:.5rem}
+.meta span{display:block;font-family:'JetBrains Mono',monospace;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+/* log de portada */
+.tape{font-family:'JetBrains Mono',monospace;font-size:.8rem;margin-top:2rem;max-width:620px;border:1px solid var(--ink);border-radius:4px;background:var(--card);box-shadow:3px 3px 0 var(--line)}
+.tape .h{padding:.4rem .8rem;border-bottom:1px solid var(--ink);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between}
+.tape .r{display:grid;grid-template-columns:5.5rem 1fr auto;gap:.8rem;padding:.35rem .8rem;border-bottom:1px solid var(--line)}
+.tape .r:last-child{border-bottom:0}
+.tape .o{color:var(--muted)}
+.tape .r.old{color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(194,65,31,.5)}
+.tape .r.now{background:rgba(194,65,31,.08)}
+.tape .r.now .t{color:var(--accent);font-weight:500}
+.cursor{display:inline-block;width:.55em;height:1em;background:var(--accent);vertical-align:-.15em;margin-left:.3rem;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+@media (max-width:900px){
+  section.s::before,section.s::after{display:none}
+  section.s{padding:9vh 6vw}
+}
+@media (max-width:760px){
+  .top .brand{display:none}
+  .top nav{justify-content:center;width:100%}
+  .top{padding:.6rem 3vw}
+}
+@media (prefers-reduced-motion: reduce){section.s{transition:none;opacity:1;transform:none}html{scroll-behavior:auto}.cursor{animation:none}}
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<header class="top">
+  <div class="brand">ARTI-4219 · <b>Hoja de trabajo 8</b></div>
+  <nav id="nav">
+    <a href="#inicio" data-nav="inicio">Inicio</a>
+    <a href="#contenido" data-nav="contenido">Contenido</a>
+    <a href="#i" data-nav="i">I</a>
+    <a href="#ii" data-nav="ii">II</a>
+    <a href="#iii" data-nav="iii">III</a>
+    <a href="#iv" data-nav="iv">IV</a>
+    <a href="#v" data-nav="v">V</a>
+    <a href="#vi" data-nav="vi">VI</a>
+    <a href="#vii" data-nav="vii">VII</a>
+  </nav>
+</header>
+<div class="bar" id="bar"></div>
+
+<main>
+
+<!-- PORTADA -->
+<section class="s hero" id="inicio" data-group="inicio" data-offset="0000">
+  <div class="kicker">ARTI-4219 Arquitectura de Plataformas · Hoja de trabajo 8</div>
+  <h1>Retail-Core:<br>del <span class="strike">delta</span> al <span class="acc">estado</span></h1>
+  <p class="muted" style="max-width:700px">Arquitectura orientada a eventos con Event-Carried State Transfer sobre Apache Kafka, contrato de datos en JSON Schema y política de compatibilidad en el Schema Registry.</p>
+  <div class="tape" aria-label="Ejemplo de log compactado">
+    <div class="h"><span>inventory.stock.state.v1</span><span>clave · productId</span></div>
+    <div class="r old"><span class="o">offset 0104</span><span>X123 · currentStock 50 · v16</span><span>reemplazado</span></div>
+    <div class="r"><span class="o">offset 0105</span><span>X124 · currentStock 12 · v03</span><span>vigente</span></div>
+    <div class="r now"><span class="o">offset 0106</span><span>X123 · currentStock 48 · v17<span class="cursor"></span></span><span class="t">último estado</span></div>
+  </div>
+  <div class="row" style="margin-top:1.8rem"><a class="btn on" href="#contenido">Empezar ↓</a></div>
+  <div class="meta">
+    <div><span>Programa</span>Maestría en Arquitecturas de TI · Uniandes</div>
+    <div><span>Periodo</span>2026-20 · Grupo [X]</div>
+    <div><span>Plataforma</span>Apache Kafka · JSON Schema · Schema Registry</div>
+    <div style="grid-column:1/-1"><span>Integrantes</span>Daniel Rubio Sierra · Diego Latorre Carrasquilla · Andrés Felipe Suárez Moscoso · Maycol Alejandro Yate Estupiñán · Ruben Antonio Parra Medrano</div>
+  </div>
+</section>
+
+<!-- CONTENIDO -->
+<section class="s" id="contenido" data-group="contenido" data-offset="0001">
+  <div class="kicker">Contenido</div>
+  <h2>Índice</h2>
+  <div class="index">
+    <a href="#i"><span class="n">I</span><div><h3>Diagnóstico AS-IS</h3><p class="muted">Por qué falla el evento delta hoy</p></div></a>
+    <a href="#ii"><span class="n">II</span><div><h3>Línea base y arquitectura TO-BE</h3><p class="muted">Decisiones arquitectónicas y flujo de eventos</p></div></a>
+    <a href="#iii"><span class="n">III</span><div><h3>Diseño del evento ECST</h3><p class="muted">Estructura JSON y justificación del desacoplamiento</p></div></a>
+    <a href="#iv"><span class="n">IV</span><div><h3>Data Contract en JSON Schema</h3><p class="muted">Tipado fuerte, obligatorios y validaciones</p></div></a>
+    <a href="#v"><span class="n">V</span><div><h3>Política de compatibilidad</h3><p class="muted">BACKWARD, FORWARD, FULL y FULL_TRANSITIVE</p></div></a>
+    <a href="#vi"><span class="n">VI</span><div><h3>Escenario: se elimina productId</h3><p class="muted">Intercepción paso a paso y mecanismos de prevención</p></div></a>
+    <a href="#vii"><span class="n">VII</span><div><h3>Cierre</h3><p class="muted">Equipo, cobertura de la rúbrica, conclusiones y referencias</p></div></a>
+  </div>
+</section>
+
+<!-- I · DIAGNÓSTICO -->
+<section class="s" id="i" data-group="i" data-offset="0002">
+  <div class="kicker"><span class="sec">I</span>Diagnóstico AS-IS <span class="owner">Responsable: Diego</span></div>
+  <h2>Un flujo sin contrato ni estado</h2>
+  <div class="grid">
+    <div class="card accent">
+      <h3>Situación actual</h3>
+      <p>InventoryService publica un evento delta en JSON plano y sin esquema cada vez que cambia el stock:</p>
+      <pre style="margin-top:.8rem">{ "productId": "X123",
+  "stockChange": -2 }</pre>
+    </div>
+    <div class="card warn">
+      <h3>Consecuencia</h3>
+      <p>PurchasingService necesita saber si debe reabastecer, pero el delta no le dice el total. Para averiguarlo consulta la base de datos de Inventarios, y eso satura sus APIs.</p>
+    </div>
+  </div>
+  <div class="grid" style="margin-top:1.1rem">
+    <div class="card"><span class="tag red">Falla 01</span><h3>Ruptura silenciosa del esquema</h3><p>Inventarios renombra <code>stockChange</code> a <code>delta</code> sin aviso. Sin Schema Registry no hay gatekeeper en la ruta de escritura.</p></div>
+    <div class="card"><span class="tag red">Falla 02</span><h3>Consulta síncrona de retorno</h3><p>El delta no lleva estado. Reaparecen el acoplamiento punto a punto y la disponibilidad invertida.</p></div>
+    <div class="card"><span class="tag red">Falla 03</span><h3>Historial no compactable</h3><p>Cada delta es necesario para reconstruir el total. Un consumidor nuevo debe procesar toda la historia.</p></div>
+  </div>
+</section>
+
+<!-- II · LÍNEA BASE -->
+<section class="s" id="ii" data-group="ii" data-offset="0003">
+  <div class="kicker"><span class="sec">II</span>Línea base · Decisiones arquitectónicas <span class="owner">Responsable: Diego</span></div>
+  <h2>Decisiones aprobadas como punto de partida</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Decisión</th><th>Elección</th><th>Por qué</th></tr></thead>
+    <tbody>
+      <tr><td>Patrón</td><td>Event-Carried State Transfer (ECST)</td><td>El evento lleva el estado público completo y elimina la consulta de retorno.</td></tr>
+      <tr><td>Plataforma de eventos</td><td>Apache Kafka</td><td>Registro duradero de solo adición, particionado y con compactación por clave.</td></tr>
+      <tr><td>Tópico</td><td><code>inventory.stock.state.v1</code></td><td>Nombre por dominio, entidad y tipo de evento; versión mayor en el nombre.</td></tr>
+      <tr><td>Clave de partición</td><td><code>productId</code></td><td>Todos los eventos de un producto van a la misma partición y conservan su orden.</td></tr>
+      <tr><td>Retención</td><td><code>cleanup.policy=compact</code></td><td>Se conserva el último estado por producto; el tópico crece con los productos, no con los cambios.</td></tr>
+      <tr><td>Contrato de datos</td><td>JSON Schema</td><td>Formato legible y alineado con el payload JSON actual; validación en el serializador.</td></tr>
+      <tr><td>Schema Registry</td><td>FULL_TRANSITIVE (evaluado en la sección V)</td><td>Compatibilidad en ambos sentidos contra todas las versiones históricas.</td></tr>
+      <tr><td>Consumidor</td><td>Proyección local en PurchasingService</td><td>Decide el reabastecimiento sin llamar a InventoryService.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- II · AS-IS VS TO-BE -->
+<section class="s" id="ii-tobe" data-group="ii" data-offset="0004">
+  <div class="kicker"><span class="sec">II</span>Arquitectura · AS-IS frente a TO-BE <span class="owner">Responsable: Diego</span></div>
+  <h2>Del acoplamiento síncrono al flujo de estado</h2>
+  <figure>
+    <svg class="flow" viewBox="0 0 900 420" role="img" aria-label="Comparación AS-IS y TO-BE">
+      <text x="30" y="34" class="hd bad">AS-IS · delta sin esquema + consulta de retorno</text>
+      <rect class="bx" x="30" y="54" width="190" height="62" rx="3"/>
+      <text x="125" y="81" text-anchor="middle">InventoryService</text>
+      <text x="125" y="100" text-anchor="middle" class="sub">publica delta</text>
+      <rect class="bx" x="355" y="54" width="190" height="62" rx="3"/>
+      <text x="450" y="81" text-anchor="middle">tópico sin esquema</text>
+      <text x="450" y="100" text-anchor="middle" class="sub">{productId, stockChange}</text>
+      <rect class="bx" x="680" y="54" width="190" height="62" rx="3"/>
+      <text x="775" y="81" text-anchor="middle">PurchasingService</text>
+      <text x="775" y="100" text-anchor="middle" class="sub">no conoce el total</text>
+      <path class="ln" d="M220 85 L355 85"/>
+      <path class="ln" d="M545 85 L680 85"/>
+      <path class="ln bad" d="M775 116 C775 175 125 175 125 116"/>
+      <text x="450" y="168" text-anchor="middle" class="small-bad">GET /stock/{productId} · API síncrona saturada</text>
+      <rect class="m-i" x="-6" y="-6" width="12" height="12"><animateMotion dur="3s" repeatCount="indefinite" path="M220 85 L680 85"/></rect>
+      <rect class="m-a" x="-6" y="-6" width="12" height="12"><animateMotion dur="2.4s" repeatCount="indefinite" path="M775 116 C775 175 125 175 125 116"/></rect>
+
+      <line class="sep" x1="30" y1="200" x2="870" y2="200"/>
+      <text x="30" y="234" class="hd good">TO-BE · ECST en Kafka con contrato gobernado</text>
+      <rect class="bx reg" x="355" y="252" width="190" height="56" rx="3"/>
+      <text x="450" y="277" text-anchor="middle">Schema Registry</text>
+      <text x="450" y="295" text-anchor="middle" class="sub">FULL_TRANSITIVE</text>
+      <rect class="bx" x="30" y="335" width="190" height="62" rx="3"/>
+      <text x="125" y="362" text-anchor="middle">InventoryService</text>
+      <text x="125" y="381" text-anchor="middle" class="sub">publica estado actual</text>
+      <rect class="bx good" x="355" y="335" width="190" height="62" rx="3"/>
+      <text x="450" y="362" text-anchor="middle">inventory.stock.state.v1</text>
+      <text x="450" y="381" text-anchor="middle" class="sub">clave productId · compactado</text>
+      <rect class="bx good" x="680" y="335" width="190" height="62" rx="3"/>
+      <text x="775" y="362" text-anchor="middle">PurchasingService</text>
+      <text x="775" y="381" text-anchor="middle" class="sub">proyección local</text>
+      <path class="ln" d="M220 366 L355 366"/>
+      <path class="ln" d="M545 366 L680 366"/>
+      <path class="ln reg" d="M170 335 C200 280 300 280 355 280"/>
+      <path class="ln reg" d="M545 280 C600 280 700 280 730 335"/>
+      <text x="200" y="274" class="sub">valida al escribir</text>
+      <text x="610" y="270" class="sub">esquema por ID</text>
+      <rect class="m-g" x="-6" y="-6" width="12" height="12"><animateMotion dur="3s" repeatCount="indefinite" path="M220 366 L680 366"/></rect>
+      <rect class="m-o" x="-5" y="-5" width="10" height="10"><animateMotion dur="3s" begin="1.5s" repeatCount="indefinite" path="M220 366 L680 366"/></rect>
+    </svg>
+    <figcaption><b>Figura 1.</b> Arriba, el consumidor vuelve a llamar a la API de Inventarios para conocer el total. Abajo, el productor publica el estado validado por el Schema Registry y el consumidor lo materializa sin consultas de retorno.</figcaption>
+  </figure>
+</section>
+
+<!-- III · EVENTO ECST -->
+<section class="s" id="iii" data-group="iii" data-offset="0005">
+  <div class="kicker"><span class="sec">III</span>Diseño del evento ECST · Estructura <span class="owner">Responsable: Daniel</span></div>
+  <h2>El evento transporta el estado, no la variación</h2>
+  <div class="row">
+    <button class="btn" data-tab="delta">AS-IS · evento delta</button>
+    <button class="btn amberon on" data-tab="ecst">TO-BE · evento de estado</button>
+  </div>
+  <div class="view" id="tab-delta">
+    <pre>{ "productId": "X123", "stockChange": -2 }</pre>
+    <ul class="clean" style="margin-top:1.1rem">
+      <li>Describe <strong>qué pasó</strong>, no cuánto hay.</li>
+      <li>Si el evento llega dos veces, el descuento se aplica dos veces.</li>
+      <li>Para conocer el total, el consumidor debe llamar a Inventarios.</li>
+    </ul>
+  </div>
+  <div class="view on" id="tab-ecst">
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+      <pre><span class="cm">// Kafka · tópico inventory.stock.state.v1
+// key = "X123"</span>
+{
+  "eventId":      "6f1c2a9e-4b7d-4e2a-9c31-8d5f0e7b2a14",
+  "eventType":    "InventoryStockStateUpdated",
+  "productId":    "X123",
+  "currentStock": 48,
+  "version":      17,
+  "occurredAt":   "2026-10-25T14:32:05.120Z"
+}</pre>
+      <div class="tw"><table>
+        <thead><tr><th>Campo</th><th>Rol</th></tr></thead>
+        <tbody>
+          <tr><td><code>eventId</code></td><td>Identidad del mensaje; permite descartar duplicados.</td></tr>
+          <tr><td><code>eventType</code></td><td>Clasifica el evento: actualización o snapshot de reconciliación.</td></tr>
+          <tr><td><code>productId</code></td><td>Clave de negocio y de partición.</td></tr>
+          <tr><td><code>currentStock</code></td><td>Estado actual completo: el dato que hoy obliga a consultar la API.</td></tr>
+          <tr><td><code>version</code></td><td>Contador creciente por producto; ordena y evita sobrescribir con un estado viejo.</td></tr>
+          <tr><td><code>occurredAt</code></td><td>Momento en que el estado fue válido.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+</section>
+
+<!-- III · JUSTIFICACIÓN -->
+<section class="s" id="iii-justificacion" data-group="iii" data-offset="0006">
+  <div class="kicker"><span class="sec">III</span>Diseño del evento ECST · Justificación <span class="owner">Responsable: Daniel</span></div>
+  <h2>Por qué reduce la carga de la API síncrona</h2>
+  <div class="grid">
+    <div class="card accent"><h3>Cero consultas de retorno</h3><p>PurchasingService lee <code>currentStock</code> del propio evento. La API síncrona de Inventarios sale del camino crítico del reabastecimiento.</p></div>
+    <div class="card accent"><h3>Autonomía del consumidor</h3><p>Si InventoryService cae, Purchasing sigue decidiendo con su proyección local. La disponibilidad deja de estar invertida.</p></div>
+    <div class="card accent"><h3>Desacoplamiento</h3><p>El contenido del evento lo define el bounded context de Inventarios. Purchasing nunca conoce su base de datos ni su modelo interno.</p></div>
+    <div class="card accent"><h3>Idempotencia y orden</h3><p>Reprocesar un estado da el mismo resultado. Con <code>version</code>, el consumidor ignora todo evento cuya versión no supere la que ya tiene.</p></div>
+  </div>
+  <div class="callout g">
+    <h3>Regla de materialización en PurchasingService</h3>
+    <pre style="margin-top:.5rem">al recibir evento e:
+  actual = proyeccion.get(e.productId)
+  si actual == null  o  e.version > actual.version:
+      proyeccion.upsert(e.productId, e)      <span class="cm">// estado más reciente</span>
+      si e.currentStock <= puntoDeReorden(e.productId):
+          generarOrdenDeCompra(e.productId)
+  si no:
+      descartar(e)                            <span class="cm">// duplicado o desordenado</span></pre>
+  </div>
+  <p class="muted" style="margin-top:1rem;font-size:.94rem">El punto de reorden pertenece al dominio de Compras, por eso no viaja en el evento de Inventarios.</p>
+</section>
+
+<!-- IV · JSON SCHEMA -->
+<section class="s" id="iv" data-group="iv" data-offset="0007">
+  <div class="kicker"><span class="sec">IV</span>Data Contract · JSON Schema <span class="owner">Responsable: Andrés</span></div>
+  <h2>Contrato formal del State Event</h2>
+  <pre>{
+  <span class="k">"$schema"</span>: <span class="s2">"http://json-schema.org/draft-07/schema#"</span>,
+  <span class="k">"$id"</span>: <span class="s2">"https://retailcore.example/schemas/inventory/stock-state/v1.json"</span>,
+  <span class="k">"title"</span>: <span class="s2">"InventoryStockState"</span>,
+  <span class="k">"description"</span>: <span class="s2">"Estado actual del inventario de un producto (ECST). Dueño: equipo de Inventarios."</span>,
+  <span class="k">"type"</span>: <span class="s2">"object"</span>,
+  <span class="k">"properties"</span>: {
+    <span class="k">"eventId"</span>:      { <span class="k">"type"</span>: <span class="s2">"string"</span>, <span class="k">"format"</span>: <span class="s2">"uuid"</span>,
+                      <span class="k">"description"</span>: <span class="s2">"Identificador único del evento."</span> },
+    <span class="k">"eventType"</span>:    { <span class="k">"type"</span>: <span class="s2">"string"</span>,
+                      <span class="k">"enum"</span>: [<span class="s2">"InventoryStockStateUpdated"</span>, <span class="s2">"InventoryStockSnapshot"</span>],
+                      <span class="k">"description"</span>: <span class="s2">"Actualización de estado o snapshot de reconciliación."</span> },
+    <span class="k">"productId"</span>:    { <span class="k">"type"</span>: <span class="s2">"string"</span>, <span class="k">"minLength"</span>: 1, <span class="k">"maxLength"</span>: 64,
+                      <span class="k">"pattern"</span>: <span class="s2">"^[A-Z0-9-]+$"</span>,
+                      <span class="k">"description"</span>: <span class="s2">"Identificador del producto; clave de partición."</span> },
+    <span class="k">"currentStock"</span>: { <span class="k">"type"</span>: <span class="s2">"integer"</span>, <span class="k">"minimum"</span>: 0,
+                      <span class="k">"description"</span>: <span class="s2">"Unidades disponibles al momento del evento."</span> },
+    <span class="k">"version"</span>:      { <span class="k">"type"</span>: <span class="s2">"integer"</span>, <span class="k">"minimum"</span>: 1,
+                      <span class="k">"description"</span>: <span class="s2">"Versión creciente del estado del producto."</span> },
+    <span class="k">"occurredAt"</span>:   { <span class="k">"type"</span>: <span class="s2">"string"</span>, <span class="k">"format"</span>: <span class="s2">"date-time"</span>,
+                      <span class="k">"description"</span>: <span class="s2">"Fecha y hora ISO-8601 en UTC."</span> },
+    <span class="k">"reservedStock"</span>: { <span class="k">"type"</span>: <span class="s2">"integer"</span>, <span class="k">"minimum"</span>: 0,
+                      <span class="k">"description"</span>: <span class="s2">"Opcional. Unidades comprometidas en pedidos."</span> },
+    <span class="k">"warehouseId"</span>:  { <span class="k">"type"</span>: [<span class="s2">"string"</span>, <span class="s2">"null"</span>],
+                      <span class="k">"description"</span>: <span class="s2">"Opcional. Bodega de origen."</span> }
+  },
+  <span class="k">"required"</span>: [<span class="s2">"eventId"</span>, <span class="s2">"eventType"</span>, <span class="s2">"productId"</span>,
+               <span class="s2">"currentStock"</span>, <span class="s2">"version"</span>, <span class="s2">"occurredAt"</span>],
+  <span class="k">"additionalProperties"</span>: true
+}</pre>
+</section>
+
+<!-- IV · OBLIGATORIOS -->
+<section class="s" id="iv-obligatorios" data-group="iv" data-offset="0008">
+  <div class="kicker"><span class="sec">IV</span>Data Contract · Obligatorios y validaciones <span class="owner">Responsable: Andrés</span></div>
+  <h2>Qué es obligatorio y qué se valida</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Campo</th><th>Tipo</th><th>Estado</th><th>Validación</th></tr></thead>
+    <tbody>
+      <tr><td><code>eventId</code></td><td>string · uuid</td><td><span class="tag red">required</span></td><td>Formato UUID</td></tr>
+      <tr><td><code>eventType</code></td><td>string · enum</td><td><span class="tag red">required</span></td><td>Solo los valores del catálogo</td></tr>
+      <tr><td><code>productId</code></td><td>string</td><td><span class="tag red">required</span></td><td>1–64 caracteres, mayúsculas, dígitos y guion</td></tr>
+      <tr><td><code>currentStock</code></td><td>integer</td><td><span class="tag red">required</span></td><td>Entero ≥ 0, sin decimales</td></tr>
+      <tr><td><code>version</code></td><td>integer</td><td><span class="tag red">required</span></td><td>Entero ≥ 1</td></tr>
+      <tr><td><code>occurredAt</code></td><td>string · date-time</td><td><span class="tag red">required</span></td><td>ISO-8601 (RFC 3339)</td></tr>
+      <tr><td><code>reservedStock</code></td><td>integer</td><td><span class="tag green">opcional</span></td><td>Entero ≥ 0 cuando viene</td></tr>
+      <tr><td><code>warehouseId</code></td><td>string | null</td><td><span class="tag green">opcional</span></td><td>Admite null explícito</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout">
+    <h3>Cómo se expresa la obligatoriedad en JSON Schema</h3>
+    <p>Un campo es obligatorio si aparece en <code>required</code>; los demás son opcionales. El tipo de cada campo es explícito: no hay <code>object</code> libres ni tipos genéricos. Los dos opcionales son propuesta para discutir en el equipo; la línea base aprobada son los seis obligatorios.</p>
+  </div>
+  <div class="callout g">
+    <h3>A verificar en la implementación</h3>
+    <p>Las palabras clave <code>format</code> (uuid, date-time) no siempre se validan por defecto: depende del validador. Hay que confirmar que el serializador las aplica o reforzarlas con <code>pattern</code>.</p>
+  </div>
+</section>
+
+<!-- V · COMPATIBILIDAD -->
+<section class="s" id="v" data-group="v" data-offset="0009">
+  <div class="kicker"><span class="sec">V</span>Política de compatibilidad · Evaluación <span class="owner">Responsable: Maycol</span></div>
+  <h2>Elige el modo y observa el efecto</h2>
+  <p class="muted">Caso de prueba: la versión 2 del esquema elimina <code>productId</code>.</p>
+  <div class="row">
+    <button class="btn" data-mode="BACKWARD">BACKWARD</button>
+    <button class="btn" data-mode="FORWARD">FORWARD</button>
+    <button class="btn" data-mode="FULL">FULL</button>
+    <button class="btn on" data-mode="FULL_TRANSITIVE">FULL_TRANSITIVE</button>
+  </div>
+  <div class="result" id="result"></div>
+  <div class="tw" style="margin-top:1.4rem"><table>
+    <thead><tr><th>Modo</th><th>Valida contra</th><th>Orden de despliegue</th></tr></thead>
+    <tbody>
+      <tr><td>BACKWARD</td><td>Versión anterior; lector nuevo con datos viejos</td><td>Consumidores primero</td></tr>
+      <tr><td>FORWARD</td><td>Versión anterior; lector viejo con datos nuevos</td><td>Productores primero</td></tr>
+      <tr><td>FULL</td><td>Versión anterior, en ambos sentidos</td><td>Cualquier orden</td></tr>
+      <tr><td>FULL_TRANSITIVE</td><td>Todas las versiones, en ambos sentidos</td><td>Cualquier orden, incluso al reprocesar desde el offset 0</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- V · LIMITACIÓN -->
+<section class="s" id="v-limitacion" data-group="v" data-offset="0010">
+  <div class="kicker"><span class="sec">V</span>Política de compatibilidad · Decisión y limitaciones <span class="owner">Responsable: Maycol</span></div>
+  <h2>FULL_TRANSITIVE: qué protege y qué cuesta</h2>
+  <div class="grid">
+    <div class="card accent">
+      <span class="tag green">Protege</span>
+      <h3>Los campos críticos</h3>
+      <p>Eliminar un campo obligatorio, volverlo opcional o renombrarlo (que equivale a eliminar uno y añadir otro) rompe la lectura de los consumidores viejos. FULL_TRANSITIVE lo rechaza contra cualquier versión histórica.</p>
+    </div>
+    <div class="card warn">
+      <span class="tag amber">Limitación</span>
+      <h3>La evolución en JSON Schema</h3>
+      <p>En JSON Schema la compatibilidad depende del modelo de contenido. Con modelo abierto (<code>additionalProperties: true</code>) o cerrado, añadir o quitar propiedades opcionales tampoco pasa una verificación FULL.</p>
+    </div>
+    <div class="card">
+      <span class="tag red">No protege</span>
+      <h3>La semántica</h3>
+      <p>Si <code>currentStock</code> pasa a significar «stock más reservas», el esquema no cambia y el Registry no lo detecta. Eso se cubre con revisión del contrato por los consumidores.</p>
+    </div>
+  </div>
+  <div class="callout">
+    <h3>Decisión propuesta</h3>
+    <p>Configurar <strong>FULL_TRANSITIVE</strong> en el subject <code>inventory.stock.state.v1-value</code>, porque el tópico es compactado y un consumidor nuevo lo relee desde el offset 0. Para poder añadir campos opcionales en el futuro sin romper la política, el equipo debe elegir entre un modelo de contenido parcialmente abierto o publicar una versión mayor en un tópico <code>v2</code> con producción dual.</p>
+  </div>
+</section>
+
+<!-- VI · ESCENARIO -->
+<section class="s" id="vi" data-group="vi" data-offset="0011">
+  <div class="kicker"><span class="sec">VI</span>Escenario · Se elimina productId <span class="owner">Responsable: Rubén</span></div>
+  <h2>Un junior elimina <code>productId</code> en su despliegue</h2>
+  <div class="row"><button class="btn on" id="walkStart">▶ Iniciar recorrido</button><button class="btn" id="walkPrev" disabled>← Anterior</button><button class="btn" id="walkNext" disabled>Siguiente →</button><span class="count" id="walkCount"></span></div>
+  <div class="walk" id="walk"></div>
+  <div class="dotsteps" id="walkDots"></div>
+</section>
+
+<!-- VI · MECANISMOS -->
+<section class="s" id="vi-mecanismos" data-group="vi" data-offset="0012">
+  <div class="kicker"><span class="sec">VI</span>Escenario · Mecanismos de prevención <span class="owner">Responsable: Rubén</span></div>
+  <h2>Cuatro barreras antes de producción</h2>
+  <div class="grid">
+    <div class="card accent"><span class="tag">1 · Pull request</span><h3>Revisión del contrato</h3><p>El esquema vive en el repositorio y cada cambio pasa por un PR que aprueban los dueños de los consumidores.</p></div>
+    <div class="card accent"><span class="tag">2 · CI</span><h3>Prueba de compatibilidad</h3><p>El pipeline consulta la API de compatibilidad del Registry antes de construir. Un esquema incompatible detiene el pipeline.</p></div>
+    <div class="card accent"><span class="tag">3 · Registro</span><h3>Sin autorregistro</h3><p>En producción, <code>auto.register.schemas=false</code>: el productor solo usa esquemas ya registrados por el pipeline.</p></div>
+    <div class="card accent"><span class="tag">4 · Serializador</span><h3>Validación del payload</h3><p>Si el código omite <code>productId</code> aunque el esquema no cambie, el serializador valida contra el esquema y rechaza el mensaje.</p></div>
+  </div>
+  <div class="callout">
+    <h3>Si el cambio es realmente necesario</h3>
+    <p>Un cambio destructivo legítimo no se fuerza sobre <code>v1</code>: se publica <code>inventory.stock.state.v2</code>, se produce en ambos tópicos durante una ventana de migración acordada y se marca <code>v1</code> como obsoleto.</p>
+  </div>
+</section>
+
+<!-- VII · EQUIPO -->
+<section class="s" id="vii" data-group="vii" data-offset="0013">
+  <div class="kicker"><span class="sec">VII</span>Cierre · Equipo</div>
+  <h2>Responsables por componente</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Integrante</th><th>Componente</th><th>Sección</th></tr></thead>
+    <tbody>
+      <tr><td>Diego Latorre Carrasquilla</td><td>Arquitectura AS-IS / TO-BE, diagrama de componentes, flujo de eventos, decisiones e integración</td><td>I · II</td></tr>
+      <tr><td>Daniel Rubio Sierra</td><td>Diseño del evento ECST, estructura JSON y justificación del desacoplamiento</td><td>III</td></tr>
+      <tr><td>Andrés Felipe Suárez Moscoso</td><td>Data Contract en JSON Schema, tipado fuerte, obligatorios y validaciones</td><td>IV</td></tr>
+      <tr><td>Maycol Alejandro Yate Estupiñán</td><td>Evaluación y selección de la política de compatibilidad</td><td>V</td></tr>
+      <tr><td>Ruben Antonio Parra Medrano</td><td>Escenario de eliminación de productId y mecanismos de prevención</td><td>VI</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- VII · RÚBRICA -->
+<section class="s" id="vii-rubrica" data-group="vii" data-offset="0014">
+  <div class="kicker"><span class="sec">VII</span>Cierre · Cobertura de la rúbrica</div>
+  <h2>Cómo cubrimos cada criterio</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Criterio</th><th>Peso</th><th>Cómo lo cubrimos</th></tr></thead>
+    <tbody>
+      <tr><td>Rediseño ECST y desacoplamiento</td><td>30%</td><td>Evento con <code>currentStock</code> y <code>version</code>, regla de materialización y análisis de autonomía (III)</td></tr>
+      <tr><td>Formalización del contrato</td><td>30%</td><td>JSON Schema con tipos estrictos, <code>required</code>, opcionales y descripciones (IV)</td></tr>
+      <tr><td>Política del Schema Registry</td><td>30%</td><td>FULL_TRANSITIVE con implicaciones de despliegue, limitaciones y escenario paso a paso (V · VI)</td></tr>
+      <tr><td>Estructura y comunicación</td><td>10%</td><td>Documento único por secciones, figuras, tablas y referencias (I–VII)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- VII · CONCLUSIONES -->
+<section class="s" id="vii-conclusiones" data-group="vii" data-offset="0015">
+  <div class="kicker"><span class="sec">VII</span>Conclusiones y referencias</div>
+  <h2>Conclusiones</h2>
+  <ul class="clean">
+    <li>El evento de estado reemplaza la <strong>llamada síncrona de retorno</strong> por una proyección que PurchasingService mantiene por sí mismo.</li>
+    <li><code>version</code> y la clave <code>productId</code> dan <strong>orden e idempotencia</strong> por producto.</li>
+    <li>El contrato en JSON Schema hace <strong>explícitos</strong> los tipos, los obligatorios y las validaciones.</li>
+    <li><strong>FULL_TRANSITIVE</strong> protege los campos críticos, pero en JSON Schema exige decidir el modelo de contenido para poder evolucionar.</li>
+    <li>Un cambio destructivo se detiene en la <strong>ruta de escritura</strong>, no en producción.</li>
+  </ul>
+  <h3 style="margin-top:1.6rem">Referencias</h3>
+  <ul class="clean muted" style="font-size:.95rem">
+    <li>Bellemare, A. (2023). <em>Building an Event-Driven Data Mesh</em>. O'Reilly Media, Inc.</li>
+    <li>Bellemare, A. (2025). <em>Building Event-Driven Microservices, 2nd Edition</em>. O'Reilly Media, Inc.</li>
+    <li>Confluent. <em>Schema Evolution and Compatibility for Schema Registry</em>. <a href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">docs.confluent.io</a></li>
+    <li>Yokota, R. (2021). <em>Understanding JSON Schema Compatibility</em>. <a href="https://yokota.blog/2021/03/29/understanding-json-schema-compatibility/">yokota.blog</a></li>
+    <li>Apicurio Registry. <a href="https://www.apicur.io/registry/">apicur.io/registry</a></li>
+  </ul>
+  <p class="foot" style="margin-top:2.5rem">ARTI-4219 Arquitectura de Plataformas · Maestría en Arquitecturas de TI · Universidad de los Andes · 2026-20</p>
+</section>
+
+</main>
+
+<script>
+/* ---------- Fondo: carriles de partición con mensajes ---------- */
+(function(){
+  const c = document.getElementById('bg'), x = c.getContext('2d');
+  let W, H, lanes = [], msgs = [];
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function resize(){
+    W = c.width = innerWidth; H = c.height = innerHeight;
+    const n = Math.max(6, Math.round(H / 110));
+    lanes = Array.from({length:n}, (_, i) => (i + .5) * (H / n));
+    msgs = Array.from({length: Math.round(W / 38)}, () => ({
+      x: Math.random() * W,
+      y: lanes[Math.floor(Math.random() * n)],
+      v: .18 + Math.random() * .55,
+      s: 5 + Math.random() * 4,
+      hot: Math.random() < .14
+    }));
+  }
+  function draw(){
+    x.clearRect(0, 0, W, H);
+    x.lineWidth = 1;
+    x.strokeStyle = 'rgba(28,27,25,.09)';
+    for(const y of lanes){ x.beginPath(); x.moveTo(0, y); x.lineTo(W, y); x.stroke(); }
+    for(const m of msgs){
+      m.x += m.v; if(m.x > W + 10) m.x = -10;
+      x.fillStyle = m.hot ? 'rgba(194,65,31,.5)' : 'rgba(28,27,25,.16)';
+      x.fillRect(m.x - m.s/2, m.y - m.s/2, m.s, m.s);
+    }
+    if(!reduce) requestAnimationFrame(draw);
+  }
+  addEventListener('resize', resize); resize(); draw();
+})();
+
+/* ---------- Revelar secciones al desplazarse ---------- */
+const sections = [...document.querySelectorAll('section.s')];
+const io = new IntersectionObserver(entries => {
+  entries.forEach(en => { if(en.isIntersecting) en.target.classList.add('in'); });
+}, {threshold: 0.12});
+sections.forEach(s => io.observe(s));
+
+/* ---------- Navegación activa y barra de progreso ---------- */
+const navLinks = [...document.querySelectorAll('#nav a')];
+const spy = new IntersectionObserver(entries => {
+  entries.forEach(en => {
+    if(!en.isIntersecting) return;
+    const g = en.target.dataset.group;
+    navLinks.forEach(a => a.classList.toggle('on', a.dataset.nav === g));
+  });
+}, {rootMargin: '-45% 0px -50% 0px'});
+sections.forEach(s => spy.observe(s));
+addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const p = h.scrollTop / (h.scrollHeight - h.clientHeight) * 100;
+  document.getElementById('bar').style.width = Math.min(100, p) + '%';
+}, {passive: true});
+
+/* ---------- Pestañas AS-IS / TO-BE ---------- */
+document.querySelectorAll('[data-tab]').forEach(b => {
+  b.onclick = () => {
+    const t = b.dataset.tab;
+    document.querySelectorAll('[data-tab]').forEach(x => x.classList.toggle('on', x===b));
+    document.getElementById('tab-delta').classList.toggle('on', t==='delta');
+    document.getElementById('tab-ecst').classList.toggle('on', t==='ecst');
+  };
+});
+
+/* ---------- Selector de modo de compatibilidad ---------- */
+const modes = {
+  BACKWARD: {tag:'ACEPTADO CON RIESGO', cls:'amber', txt:'El Registry verifica que el esquema nuevo (sin productId) valide los datos viejos. Con modelo abierto lo hace, porque admite la propiedad sobrante, y acepta el cambio. Pero un PurchasingService que siga en v1 recibiría eventos sin productId y fallaría.'},
+  FORWARD: {tag:'RECHAZADO', cls:'red', txt:'El Registry verifica que el esquema viejo valide los datos nuevos. El esquema viejo exige productId en required y los datos nuevos no lo traen, así que rechaza el cambio. No garantiza, en cambio, que un lector nuevo pueda releer la historia.'},
+  FULL: {tag:'RECHAZADO', cls:'red', txt:'Verifica ambos sentidos contra la versión inmediatamente anterior. Falla en el sentido forward, así que rechaza el cambio. Solo protege frente a la última versión, no frente a las anteriores.'},
+  FULL_TRANSITIVE: {tag:'RECHAZADO · RECOMENDADO', cls:'green', txt:'Igual que FULL, pero contra todas las versiones registradas. Es la política elegida porque el tópico es compactado y un consumidor nuevo lo relee desde el offset 0: todo evento histórico debe seguir siendo legible.'}
+};
+function setMode(m){
+  document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode===m));
+  const d = modes[m];
+  document.getElementById('result').innerHTML = `<span class="tag ${d.cls}">${d.tag}</span><p style="margin-top:.6rem">${d.txt}</p>`;
+}
+document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+setMode('FULL_TRANSITIVE');
+
+/* ---------- Recorrido del escenario ---------- */
+const walkSteps = [
+  {t:'El junior modifica el esquema', d:'Quita productId de properties y de required, y abre un PR con la versión 2 del contrato.'},
+  {t:'La CI consulta al Schema Registry', d:'El pipeline envía el esquema candidato a la API de compatibilidad del subject inventory.stock.state.v1-value.'},
+  {t:'El Registry carga todas las versiones', d:'Como el modo es FULL_TRANSITIVE, compara el candidato contra cada versión registrada, no solo contra la última.'},
+  {t:'Verificación backward', d:'¿El esquema nuevo valida los eventos viejos? Sí: los eventos viejos traen productId y el modelo abierto admite la propiedad sobrante.'},
+  {t:'Verificación forward', d:'¿Los esquemas viejos validan los eventos nuevos? No: productId está en su lista required y los eventos nuevos no lo traen.'},
+  {t:'El Registry declara la incompatibilidad', d:'La prueba falla y el pipeline se detiene. Si alguien intenta registrar el esquema directamente, el Registry responde 409 Conflict y no le asigna ID.'},
+  {t:'El productor no puede publicar', d:'Con auto.register.schemas=false, el serializador de InventoryService no encuentra un ID válido para el esquema nuevo y falla al serializar. Ningún evento llega al tópico.'},
+  {t:'Los consumidores quedan protegidos', d:'PurchasingService nunca recibe un evento sin productId. El error se detectó en la ruta de escritura y en el pipeline, no en producción.'}
+];
+let wi = -1;
+const walkEl = document.getElementById('walk'), dotsEl = document.getElementById('walkDots');
+const wStart = document.getElementById('walkStart'), wPrev = document.getElementById('walkPrev'), wNext = document.getElementById('walkNext'), wCount = document.getElementById('walkCount');
+walkSteps.forEach((_, i) => { const s = document.createElement('span'); s.onclick = () => walkGo(i); dotsEl.appendChild(s); });
+function walkGo(i){
+  wi = Math.max(-1, Math.min(walkSteps.length-1, i));
+  if(wi < 0){
+    walkEl.innerHTML = '<div class="lbl">Recorrido</div><h3>Pulsa «Iniciar recorrido»</h3><p class="muted">Cada paso muestra cómo el Schema Registry intercepta el cambio.</p>';
+  } else {
+    const s = walkSteps[wi];
+    walkEl.innerHTML = `<div class="lbl">Paso ${wi+1} de ${walkSteps.length}</div><h3>${s.t}</h3><p>${s.d}</p>`;
+  }
+  [...dotsEl.children].forEach((d, k) => d.classList.toggle('on', k <= wi));
+  wCount.textContent = wi < 0 ? '' : (wi+1) + ' / ' + walkSteps.length;
+  wPrev.disabled = wi <= 0;
+  wNext.disabled = wi >= walkSteps.length-1;
+  wStart.textContent = wi < 0 ? '▶ Iniciar recorrido' : '↺ Reiniciar';
+}
+wStart.onclick = () => walkGo(wi < 0 ? 0 : -1);
+wPrev.onclick = () => walkGo(wi-1);
+wNext.onclick = () => walkGo(wi+1);
+walkGo(-1);
+</script>
+</body>
+</html>
