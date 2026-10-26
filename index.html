@@ -364,67 +364,226 @@ figcaption b{color:var(--accent);font-family:'JetBrains Mono',monospace;font-wei
 </section>
 
 <!-- IV · JSON SCHEMA -->
+<style>
+/* Estilos exclusivos de la sección IV (prefijo iv-) */
+.iv-resol{border-top:2px solid var(--ink);margin-bottom:1.6rem}
+.iv-resol .r{display:grid;grid-template-columns:minmax(0,1fr) 2rem minmax(0,1.25fr);gap:.9rem;padding:.75rem 0;border-bottom:1px solid var(--line);align-items:start}
+.iv-resol .f b,.iv-resol .x b{display:block;font-weight:600}
+.iv-resol .f span,.iv-resol .x span{font-size:.94rem;color:var(--muted)}
+.iv-resol .to{font-family:'JetBrains Mono',monospace;color:var(--accent2);text-align:center;font-weight:500}
+.iv-resol .h{font-family:'JetBrains Mono',monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.iv-schema{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:1.4rem;align-items:start}
+.iv-schema pre{max-height:none}
+.iv-hl{display:inline-block;width:calc(100% + 2.4rem);margin-left:-1.2rem;padding-left:calc(1.2rem - 3px);background:rgba(231,183,106,.13);border-left:3px solid #E7B76A}
+.iv-notes{list-style:none;counter-reset:ivn}
+.iv-notes li{counter-increment:ivn;display:grid;grid-template-columns:2rem 1fr;gap:.6rem;padding:.7rem 0;border-bottom:1px solid var(--line)}
+.iv-notes li:first-child{border-top:2px solid var(--ink)}
+.iv-notes li::before{content:counter(ivn);font-family:'Fraunces',serif;font-weight:800;color:var(--accent);font-size:1.25rem;line-height:1.2}
+.iv-notes b{display:block}
+.iv-notes span{font-size:.94rem;color:var(--muted)}
+.iv-cases{list-style:none}
+.iv-cases li{display:grid;grid-template-columns:1.7rem minmax(0,1fr) minmax(0,1.2fr);gap:.7rem;padding:.55rem 0;border-bottom:1px solid var(--line);font-size:.94rem;align-items:start}
+.iv-cases li:first-child{border-top:2px solid var(--ink)}
+.iv-cases .mk{font-family:'JetBrains Mono',monospace;font-weight:500;width:1.4rem;height:1.4rem;display:grid;place-items:center;border:1px solid currentColor;border-radius:2px;font-size:.8rem}
+.iv-cases .ko{color:var(--accent)}
+.iv-cases .ok{color:var(--accent2)}
+.iv-cases .w{color:var(--muted)}
+.iv-cases li > span{min-width:0}
+.iv-cases code{overflow-wrap:anywhere;word-break:break-word}
+.iv-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.4rem;align-items:start}
+.iv-sub{font-family:'JetBrains Mono',monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:2rem 0 .7rem}
+.iv-qa ol{padding-left:1.3rem;margin-top:.6rem}
+.iv-qa li{margin-bottom:.5rem}
+@media (max-width:900px){
+  .iv-schema,.iv-two{grid-template-columns:1fr}
+  .iv-resol .r{grid-template-columns:1fr;gap:.2rem}
+  .iv-resol .to{text-align:left}
+  .iv-resol .r.head{display:none}
+  .iv-cases li{grid-template-columns:1.7rem minmax(0,1fr)}
+  .iv-cases .w{grid-column:2}
+}
+</style>
+
 <section class="s" id="iv" data-group="iv" data-offset="0007">
   <div class="kicker"><span class="sec">IV</span>Data Contract · JSON Schema <span class="owner">Responsable: Andrés</span></div>
-  <h2>Contrato formal del State Event</h2>
-  <pre>{
+  <h2>Un contrato que el productor no puede romper en silencio</h2>
+  <p class="muted" style="max-width:820px;margin-bottom:1.4rem">El esquema convierte el JSON libre de hoy en un evento de estado con tipos estrictos, campos obligatorios y cambios controlados. Cada regla responde a una falla concreta del caso.</p>
+
+  <div class="iv-resol">
+    <div class="r head"><span class="h">Falla del caso</span><span></span><span class="h">Regla del contrato que la resuelve</span></div>
+    <div class="r"><div class="f"><b>Renombre silencioso de campos</b><span><code>stockChange</code> pasó a <code>delta</code> sin aviso.</span></div><div class="to">→</div><div class="x"><b><code>required</code> + <code>additionalProperties: false</code></b><span>Un campo obligatorio no puede desaparecer y un nombre no declarado se rechaza en el productor.</span></div></div>
+    <div class="r"><div class="f"><b>El consumidor no conoce el total</b><span>Debe consultar la API de Inventarios.</span></div><div class="to">→</div><div class="x"><b><code>currentStock</code> entero ≥ 0, obligatorio</b><span>El evento transporta el estado absoluto; un <code>-2</code> se rechaza porque delata un delta.</span></div></div>
+    <div class="r"><div class="f"><b>Tipos que cambian</b><span>El mismo dato llega como número o como texto.</span></div><div class="to">→</div><div class="x"><b>Tipos exactos y sin nulos</b><span><code>"48"</code> o <code>null</code> no son un <code>integer</code>; JSON Schema no convierte tipos.</span></div></div>
+    <div class="r"><div class="f"><b>Eventos repetidos o fuera de orden</b><span>Un reintento podría pisar un estado nuevo.</span></div><div class="to">→</div><div class="x"><b><code>version</code> y <code>eventId</code> obligatorios</b><span>Hacen posible la regla de materialización de la sección III.</span></div></div>
+    <div class="r"><div class="f"><b>Mezcla de tipos de evento</b><span>El tópico podría volver a llenarse de deltas.</span></div><div class="to">→</div><div class="x"><b><code>eventType</code> como <code>enum</code></b><span>Solo admite los dos tipos definidos en la sección III.</span></div></div>
+  </div>
+
+  <div class="iv-schema">
+    <pre aria-label="JSON Schema del evento InventoryStockState v1">{
   <span class="k">"$schema"</span>: <span class="s2">"http://json-schema.org/draft-07/schema#"</span>,
   <span class="k">"$id"</span>: <span class="s2">"https://retailcore.example/schemas/inventory/stock-state/v1.json"</span>,
   <span class="k">"title"</span>: <span class="s2">"InventoryStockState"</span>,
   <span class="k">"description"</span>: <span class="s2">"Estado actual del inventario de un producto (ECST). Dueño: equipo de Inventarios."</span>,
   <span class="k">"type"</span>: <span class="s2">"object"</span>,
+<span class="iv-hl">  <span class="k">"additionalProperties"</span>: false,</span>
+<span class="iv-hl">  <span class="k">"required"</span>: [<span class="s2">"eventId"</span>, <span class="s2">"eventType"</span>, <span class="s2">"productId"</span>,</span>
+<span class="iv-hl">               <span class="s2">"currentStock"</span>, <span class="s2">"version"</span>, <span class="s2">"occurredAt"</span>],</span>
   <span class="k">"properties"</span>: {
-    <span class="k">"eventId"</span>:      { <span class="k">"type"</span>: <span class="s2">"string"</span>, <span class="k">"format"</span>: <span class="s2">"uuid"</span>,
-                      <span class="k">"description"</span>: <span class="s2">"Identificador único del evento."</span> },
-    <span class="k">"eventType"</span>:    { <span class="k">"type"</span>: <span class="s2">"string"</span>,
-                      <span class="k">"enum"</span>: [<span class="s2">"InventoryStockStateUpdated"</span>, <span class="s2">"InventoryStockSnapshot"</span>],
-                      <span class="k">"description"</span>: <span class="s2">"Actualización de estado o snapshot de reconciliación."</span> },
-    <span class="k">"productId"</span>:    { <span class="k">"type"</span>: <span class="s2">"string"</span>, <span class="k">"minLength"</span>: 1, <span class="k">"maxLength"</span>: 64,
-                      <span class="k">"pattern"</span>: <span class="s2">"^[A-Z0-9-]+$"</span>,
-                      <span class="k">"description"</span>: <span class="s2">"Identificador del producto; clave de partición."</span> },
-    <span class="k">"currentStock"</span>: { <span class="k">"type"</span>: <span class="s2">"integer"</span>, <span class="k">"minimum"</span>: 0,
-                      <span class="k">"description"</span>: <span class="s2">"Unidades disponibles al momento del evento."</span> },
-    <span class="k">"version"</span>:      { <span class="k">"type"</span>: <span class="s2">"integer"</span>, <span class="k">"minimum"</span>: 1,
-                      <span class="k">"description"</span>: <span class="s2">"Versión creciente del estado del producto."</span> },
-    <span class="k">"occurredAt"</span>:   { <span class="k">"type"</span>: <span class="s2">"string"</span>, <span class="k">"format"</span>: <span class="s2">"date-time"</span>,
-                      <span class="k">"description"</span>: <span class="s2">"Fecha y hora ISO-8601 en UTC."</span> },
-    <span class="k">"reservedStock"</span>: { <span class="k">"type"</span>: <span class="s2">"integer"</span>, <span class="k">"minimum"</span>: 0,
-                      <span class="k">"description"</span>: <span class="s2">"Opcional. Unidades comprometidas en pedidos."</span> },
-    <span class="k">"warehouseId"</span>:  { <span class="k">"type"</span>: [<span class="s2">"string"</span>, <span class="s2">"null"</span>],
-                      <span class="k">"description"</span>: <span class="s2">"Opcional. Bodega de origen."</span> }
-  },
-  <span class="k">"required"</span>: [<span class="s2">"eventId"</span>, <span class="s2">"eventType"</span>, <span class="s2">"productId"</span>,
-               <span class="s2">"currentStock"</span>, <span class="s2">"version"</span>, <span class="s2">"occurredAt"</span>],
-  <span class="k">"additionalProperties"</span>: true
+    <span class="k">"eventId"</span>: {
+      <span class="k">"description"</span>: <span class="s2">"UUID de la publicación; se reutiliza en reintentos."</span>,
+      <span class="k">"type"</span>: <span class="s2">"string"</span>,
+      <span class="k">"pattern"</span>: <span class="s2">"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"</span> },
+    <span class="k">"eventType"</span>: {
+      <span class="k">"description"</span>: <span class="s2">"Actualización de estado o snapshot de reconciliación."</span>,
+      <span class="k">"type"</span>: <span class="s2">"string"</span>,
+<span class="iv-hl">      <span class="k">"enum"</span>: [<span class="s2">"InventoryStockStateUpdated"</span>, <span class="s2">"InventoryStockSnapshot"</span>] },</span>
+    <span class="k">"productId"</span>: {
+      <span class="k">"description"</span>: <span class="s2">"Identificador del producto; igual a la clave del mensaje."</span>,
+      <span class="k">"type"</span>: <span class="s2">"string"</span>, <span class="k">"minLength"</span>: 1, <span class="k">"maxLength"</span>: 64,
+      <span class="k">"pattern"</span>: <span class="s2">"^[A-Z0-9][A-Z0-9-]*$"</span> },
+    <span class="k">"currentStock"</span>: {
+      <span class="k">"description"</span>: <span class="s2">"Unidades disponibles. Valor absoluto, nunca un delta."</span>,
+<span class="iv-hl">      <span class="k">"type"</span>: <span class="s2">"integer"</span>, <span class="k">"minimum"</span>: 0, <span class="k">"maximum"</span>: 2147483647 },</span>
+    <span class="k">"version"</span>: {
+      <span class="k">"description"</span>: <span class="s2">"Versión creciente del estado del producto."</span>,
+<span class="iv-hl">      <span class="k">"type"</span>: <span class="s2">"integer"</span>, <span class="k">"minimum"</span>: 1, <span class="k">"maximum"</span>: 9007199254740991 },</span>
+    <span class="k">"occurredAt"</span>: {
+      <span class="k">"description"</span>: <span class="s2">"Instante de confirmación del estado, en UTC (RFC 3339)."</span>,
+      <span class="k">"type"</span>: <span class="s2">"string"</span>, <span class="k">"format"</span>: <span class="s2">"date-time"</span>,
+      <span class="k">"pattern"</span>: <span class="s2">"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$"</span> }
+  }
 }</pre>
+    <div>
+      <h3>Claves de lectura</h3>
+      <ol class="iv-notes">
+        <li><div><b>Modelo cerrado</b><span><code>additionalProperties: false</code> rechaza cualquier campo no declarado, como <code>delta</code> o <code>stockChange</code>. En modelo abierto, el valor por defecto, pasarían sin error.</span></div></li>
+        <li><div><b>Todo es obligatorio</b><span>Un estado ECST debe ser autónomo: si falta un dato, Compras volvería a consultar a Inventarios.</span></div></li>
+        <li><div><b>Estado, no variación</b><span><code>currentStock</code> entero y no negativo, junto con el <code>enum</code> de <code>eventType</code>, separa por construcción el estado del delta.</span></div></li>
+        <li><div><b>Orden e idempotencia</b><span><code>version</code> ordena los estados de cada producto; <code>eventId</code> permite descartar duplicados.</span></div></li>
+        <li><div><b>Validación robusta</b><span><code>format</code> es solo una anotación en algunos validadores; por eso <code>occurredAt</code> y <code>eventId</code> se refuerzan con <code>pattern</code>.</span></div></li>
+      </ol>
+      <p class="muted" style="font-size:.9rem;margin-top:.9rem">Las líneas resaltadas son las que resuelven el caso Retail-Core. La línea base aprobada son seis campos, todos obligatorios.</p>
+    </div>
+  </div>
 </section>
 
-<!-- IV · OBLIGATORIOS -->
 <section class="s" id="iv-obligatorios" data-group="iv" data-offset="0008">
-  <div class="kicker"><span class="sec">IV</span>Data Contract · Obligatorios y validaciones <span class="owner">Responsable: Andrés</span></div>
-  <h2>Qué es obligatorio y qué se valida</h2>
-  <div class="tw"><table>
-    <thead><tr><th>Campo</th><th>Tipo</th><th>Estado</th><th>Validación</th></tr></thead>
-    <tbody>
-      <tr><td><code>eventId</code></td><td>string · uuid</td><td><span class="tag red">required</span></td><td>Formato UUID</td></tr>
-      <tr><td><code>eventType</code></td><td>string · enum</td><td><span class="tag red">required</span></td><td>Solo los valores del catálogo</td></tr>
-      <tr><td><code>productId</code></td><td>string</td><td><span class="tag red">required</span></td><td>1–64 caracteres, mayúsculas, dígitos y guion</td></tr>
-      <tr><td><code>currentStock</code></td><td>integer</td><td><span class="tag red">required</span></td><td>Entero ≥ 0, sin decimales</td></tr>
-      <tr><td><code>version</code></td><td>integer</td><td><span class="tag red">required</span></td><td>Entero ≥ 1</td></tr>
-      <tr><td><code>occurredAt</code></td><td>string · date-time</td><td><span class="tag red">required</span></td><td>ISO-8601 (RFC 3339)</td></tr>
-      <tr><td><code>reservedStock</code></td><td>integer</td><td><span class="tag green">opcional</span></td><td>Entero ≥ 0 cuando viene</td></tr>
-      <tr><td><code>warehouseId</code></td><td>string | null</td><td><span class="tag green">opcional</span></td><td>Admite null explícito</td></tr>
-    </tbody>
-  </table></div>
-  <div class="callout">
-    <h3>Cómo se expresa la obligatoriedad en JSON Schema</h3>
-    <p>Un campo es obligatorio si aparece en <code>required</code>; los demás son opcionales. El tipo de cada campo es explícito: no hay <code>object</code> libres ni tipos genéricos. Los dos opcionales son propuesta para discutir en el equipo; la línea base aprobada son los seis obligatorios.</p>
+  <div class="kicker"><span class="sec">IV</span>Data Contract · En acción y alternativa <span class="owner">Responsable: Andrés</span></div>
+  <h2>Qué rechaza, cómo se hace cumplir y qué cambiaría con Avro</h2>
+
+  <div class="iv-two">
+    <div>
+      <div class="iv-sub">Campos del contrato</div>
+      <div class="tw"><table>
+        <thead><tr><th>Campo</th><th>Tipo</th><th>Regla</th></tr></thead>
+        <tbody>
+          <tr><td><code>eventId</code></td><td>string</td><td>UUID por patrón</td></tr>
+          <tr><td><code>eventType</code></td><td>string · enum</td><td>Actualización o snapshot</td></tr>
+          <tr><td><code>productId</code></td><td>string</td><td>1–64 caracteres, igual a la clave</td></tr>
+          <tr><td><code>currentStock</code></td><td>integer</td><td>Entero ≥ 0</td></tr>
+          <tr><td><code>version</code></td><td>integer</td><td>Entero ≥ 1, creciente por producto</td></tr>
+          <tr><td><code>occurredAt</code></td><td>string · date-time</td><td>RFC 3339 en UTC (<code>Z</code>)</td></tr>
+        </tbody>
+      </table></div>
+      <p class="muted" style="font-size:.9rem;margin-top:.6rem">Los seis llevan <span class="tag red" style="margin:0">required</span>. <code>version</code> numera el estado del producto; la versión del esquema la asigna el Registry. Son independientes.</p>
+    </div>
+    <div>
+      <div class="iv-sub">Lo que se rechaza antes de llegar a Kafka</div>
+      <ul class="iv-cases">
+        <li><span class="mk ko">✕</span><span><code>{"productId":"X123","stockChange":-2}</code></span><span class="w">Faltan cinco obligatorios y <code>stockChange</code> no está declarado.</span></li>
+        <li><span class="mk ko">✕</span><span>Renombrar <code>currentStock</code> a <code>delta</code></span><span class="w">Campo no declarado y obligatorio ausente.</span></li>
+        <li><span class="mk ko">✕</span><span><code>"currentStock": "48"</code> o <code>null</code></span><span class="w">No es <code>integer</code>.</span></li>
+        <li><span class="mk ko">✕</span><span><code>"currentStock": -2</code></span><span class="w"><code>minimum: 0</code>: delata un delta.</span></li>
+        <li><span class="mk ko">✕</span><span>Mensaje sin <code>productId</code></span><span class="w">Está en <code>required</code>.</span></li>
+        <li><span class="mk ko">✕</span><span><code>"occurredAt": "2026-10-25T09:32:05-05:00"</code></span><span class="w">El patrón exige UTC con <code>Z</code>.</span></li>
+        <li><span class="mk ok">✓</span><span>El evento de estado de la sección III</span><span class="w">Cumple todas las reglas.</span></li>
+      </ul>
+    </div>
   </div>
-  <div class="callout g">
-    <h3>A verificar en la implementación</h3>
-    <p>Las palabras clave <code>format</code> (uuid, date-time) no siempre se validan por defecto: depende del validador. Hay que confirmar que el serializador las aplica o reforzarlas con <code>pattern</code>.</p>
+
+  <div class="callout">
+    <h3>Condición para que el contrato actúe</h3>
+    <p>El serializador JSON Schema de Confluent no valida el contenido por defecto: <code>json.fail.invalid.schema</code> vale <code>false</code>. Hay que activarlo en productor y consumidor; es lo que hace efectiva la barrera 4 de la sección VI.</p>
+    <pre style="margin-top:.6rem">value.serializer=io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializer
+json.fail.invalid.schema=true
+auto.register.schemas=false   <span class="cm"># solo el esquema aprobado en CI</span>
+use.latest.version=true</pre>
+  </div>
+
+  <div class="grid" style="margin-top:1.1rem">
+    <div class="card accent"><h3>Reglas fuera del esquema</h3><p>JSON Schema valida cada mensaje aislado. Quedan como obligaciones: el productor asigna <code>version</code> en la misma transacción que el stock, iguala <code>productId</code> a la clave y reutiliza el <code>eventId</code> en reintentos; el consumidor aplica solo versiones mayores y trata el tombstone como baja.</p></div>
+    <div class="card warn"><h3>Implicación para la sección V</h3><p>Con modelo cerrado, eliminar <code>productId</code> falla en ambos sentidos. FULL_TRANSITIVE lo bloquea incluso si alguien intenta además abrir el modelo. El costo: tampoco admite añadir campos opcionales, así que v1 queda congelado y la evolución va a un tópico <code>v2</code>.</p></div>
+  </div>
+
+  <div class="iv-sub" style="margin-top:2.4rem">¿Y si fuera Avro?</div>
+  <p style="max-width:820px">Avro es el formato de referencia en la teoría de la sesión y una opción sólida. Ninguno es superior en abstracto: cada uno resuelve mejor una parte del problema.</p>
+  <div data-ivtabs>
+    <div class="row">
+      <button class="btn amberon on" type="button" data-ivtab="cmp">Comparación</button>
+      <button class="btn amberon" type="button" data-ivtab="avsc">Esquema en Avro</button>
+      <button class="btn amberon" type="button" data-ivtab="why">¿Por qué JSON Schema?</button>
+    </div>
+
+    <div class="view on" data-ivview="cmp">
+      <div class="tw"><table>
+        <thead><tr><th>Criterio</th><th>JSON Schema</th><th>Avro</th></tr></thead>
+        <tbody>
+          <tr><td>Reglas de negocio</td><td><span class="tag amber">ventaja</span>Expresa <code>minimum: 0</code>, patrones y rangos: el rechazo de <code>-2</code> vive en el contrato.</td><td>Solo tipos y estructura; <code>-2</code> es un <code>int</code> válido y la regla iría en el código.</td></tr>
+          <tr><td>Validación de estructura</td><td>Depende de activar <code>json.fail.invalid.schema</code> y cerrar el modelo.</td><td><span class="tag green">ventaja</span>Intrínseca: no se serializa un mensaje que no cumpla el esquema.</td></tr>
+          <tr><td>Evolución con FULL</td><td>Con modelo cerrado, añadir opcionales se rechaza; se pasa a <code>v2</code>.</td><td><span class="tag green">ventaja</span>Añade o elimina campos con <code>default</code> sin cambiar de tópico.</td></tr>
+          <tr><td>Eliminar <code>productId</code></td><td><span class="tag">equivalente</span>FULL lo rechaza.</td><td><span class="tag">equivalente</span>FULL lo rechaza: no tiene <code>default</code>.</td></tr>
+          <tr><td>Tamaño del mensaje</td><td>Texto con nombres de campo en cada mensaje.</td><td><span class="tag green">ventaja</span>Binario compacto; mejor throughput.</td></tr>
+          <tr><td>Legibilidad</td><td><span class="tag amber">ventaja</span>JSON legible en consola y logs.</td><td>Binario: requiere deserializador y Registry.</td></tr>
+          <tr><td>Transición</td><td><span class="tag amber">ventaja</span>El evento ya es JSON: se añade contrato sin cambiar el payload.</td><td>Ambos servicios migran el formato a la vez.</td></tr>
+          <tr><td>Generación de código</td><td>Disponible, menos estandarizada.</td><td><span class="tag green">ventaja</span>Madura: clases tipadas en lugar de mapas.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="view" data-ivview="avsc">
+      <pre>{
+  <span class="k">"type"</span>: <span class="s2">"record"</span>, <span class="k">"name"</span>: <span class="s2">"InventoryStockState"</span>, <span class="k">"namespace"</span>: <span class="s2">"com.retailcore.inventory"</span>,
+  <span class="k">"fields"</span>: [
+    { <span class="k">"name"</span>: <span class="s2">"eventId"</span>,      <span class="k">"type"</span>: { <span class="k">"type"</span>: <span class="s2">"string"</span>, <span class="k">"logicalType"</span>: <span class="s2">"uuid"</span> } },
+    { <span class="k">"name"</span>: <span class="s2">"eventType"</span>,    <span class="k">"type"</span>: { <span class="k">"type"</span>: <span class="s2">"enum"</span>, <span class="k">"name"</span>: <span class="s2">"InventoryEventType"</span>,
+                                 <span class="k">"symbols"</span>: [<span class="s2">"InventoryStockStateUpdated"</span>, <span class="s2">"InventoryStockSnapshot"</span>] } },
+    { <span class="k">"name"</span>: <span class="s2">"productId"</span>,    <span class="k">"type"</span>: <span class="s2">"string"</span> },
+    { <span class="k">"name"</span>: <span class="s2">"currentStock"</span>, <span class="k">"type"</span>: <span class="s2">"int"</span> },    <span class="cm">// sin forma nativa de exigir ≥ 0</span>
+    { <span class="k">"name"</span>: <span class="s2">"version"</span>,      <span class="k">"type"</span>: <span class="s2">"long"</span> },
+    { <span class="k">"name"</span>: <span class="s2">"occurredAt"</span>,   <span class="k">"type"</span>: { <span class="k">"type"</span>: <span class="s2">"long"</span>, <span class="k">"logicalType"</span>: <span class="s2">"timestamp-millis"</span> } }
+  ]
+}
+<span class="cm">// En Avro, un campo sin "default" y sin unión con null ya es obligatorio.</span></pre>
+    </div>
+
+    <div class="view" data-ivview="why">
+      <div class="card iv-qa">
+        <h3>“¿Por qué JSON Schema si Avro parece mejor?”</h3>
+        <p>Avro gana en eficiencia, validación intrínseca y evolución. Elegimos JSON Schema por lo que este caso necesita resolver primero:</p>
+        <ol>
+          <li><b>El contrato expresa la regla que causó el problema.</b> “El stock nunca es negativo” separa el estado del delta; JSON Schema la declara en el propio esquema y en Avro quedaría fuera.</li>
+          <li><b>La transición es incremental.</b> Retail-Core ya publica JSON: se pasa de JSON sin contrato a JSON con contrato sin migrar ambos equipos a binario a la vez.</li>
+          <li><b>El volumen no lo exige.</b> Un evento por cambio de stock con seis campos no hace del tamaño el factor decisivo.</li>
+          <li><b>Las debilidades se mitigan.</b> La validación se activa por configuración y el congelamiento de v1 se gestiona con tópicos versionados.</li>
+        </ol>
+        <p class="muted" style="margin-top:.6rem">Cambiaríamos a Avro si el tópico crece en volumen, si el contrato debe evolucionar con frecuencia o si se suman muchos consumidores que se beneficien de clases generadas. La migración sería un tópico <code>v2</code> en Avro con producción dual.</p>
+      </div>
+    </div>
   </div>
 </section>
+
+<script>
+/* Pestañas exclusivas de la sección IV (no interfieren con las de la sección III) */
+document.querySelectorAll('[data-ivtabs]').forEach(function(group){
+  group.querySelectorAll('[data-ivtab]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var t = btn.getAttribute('data-ivtab');
+      group.querySelectorAll('[data-ivtab]').forEach(function(b){ b.classList.toggle('on', b === btn); });
+      group.querySelectorAll('[data-ivview]').forEach(function(v){ v.classList.toggle('on', v.getAttribute('data-ivview') === t); });
+    });
+  });
+});
+</script>
 
 <!-- V · COMPATIBILIDAD -->
 <section class="s" id="v" data-group="v" data-offset="0009">
